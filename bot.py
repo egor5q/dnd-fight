@@ -27,6 +27,12 @@ base = {
     'current_unit':None
 }
 
+classes = ['bard', 'barbarian', 'fighter', 'wizard', 'druid', 'cleric', 'warlock', 'monk', 'paladin',
+                  'rogue', 'ranger', 'sorcerer']
+        
+        
+races = ['elf', 'human', 'tiefling', 'half-elf', 'halfling', 'half-orc', 'dwarf', 'gnome']
+
 
 @bot.message_handler(commands=['create_unit'])
 def createunit(m):
@@ -71,6 +77,40 @@ def set_stats(m):
     bot.send_message(m.chat.id, 'Выберите юнита, которого хотите отредактировать.', reply_markup=kb)
         
 
+@bot.message_handler()
+def msgs(m):
+    user = createuser(m)
+    if user['current_stat'] != None and user['current_unit'] != None and m.from_user.id == m.chat.id:
+        numbervalues = ['hp', 'maxhp', 'strenght', 'dexterity', 'constitution', 'intelligence', 
+                       'wisdom', 'charisma', 'armor_class', 'speed']
+        text = False
+        if user['current_stat'] in numbervalues:
+            test = True
+        val = m.text
+        if test:
+            try:
+                val = int(m.text)
+            except:
+                bot.send_message(m.chat.id, 'Нужно значение типа int!')
+                return
+        test2 = False    
+        if user['current_stat'] == 'race':
+            d = races.copy()
+            test2 = True
+        if user['current_stat'] == 'class':
+            d = classes.copy()
+            test2 = True
+        if test2:
+            if m.text.lower() not in d:
+                bot.send_message(m.chat.id, 'Такого значения нет в списке существующих!')
+                return
+        users.update_one({'id':user['id']},{'$set':{'units.'+str(user['current_unit'])+'.'+user['current_stat']:val}})
+        bot.send_message(m.chat.id, 'Успешно изменена характеристика "'+user['current_stat']+'" на "'+val+'"!')
+        
+            
+        
+        
+        
 @bot.callback_query_handler(func=lambda call: True)
 def inline(call):
     user = createuser(call)
@@ -81,6 +121,34 @@ def inline(call):
             return
         kb = create_edit_kb(unit)
         bot.send_message(m.chat.id, 'Нажмите на характеристику для её изменения.', reply_markup=kb)
+        
+    elif 'change' in call.data:
+        blist = ['inventory', 'spells', 'player', 'photo']
+        numbervalues = ['hp', 'maxhp', 'strenght', 'dexterity', 'constitution', 'intelligence', 
+                       'wisdom', 'charisma', 'armor_class', 'speed', 'name']
+        what = call.data.split(' ')[1]
+        unit = user['units'][int(call.data.split(' ')[2])]
+        if unit == None:
+            bot.answer_callback_query(call.id, 'Такого юнита не существует!', show_alert = True)
+            return
+        if what not in blist:
+            users.update_one({'id':user['id']},{'$set':{'current_unit':unit['id'], 'current_stat':what}})
+            if what in numbervalues:
+                bot.send_message(m.chat.id, 'Теперь пришлите мне новое значение характеристики "'+what+'".')
+            else:
+                if what == 'race':
+                    r = 'расы'
+                    alls = ''
+                    for ids in races:
+                        alls += '`'+ids+'` '
+                elif what == 'class':
+                    r = 'классы'
+                    alls = ''
+                    for ids in classes:
+                        alls += '`'+ids+'` '
+                bot.send_message(m.chat.id, 'Теперь пришлите мне новое значение характеристики "'+what+'".\n'+
+                                 'Существующие '+r+': '+alls, parse_mode = 'markdown')
+                
     
     
 def create_etit_kb(unit):
@@ -90,7 +158,6 @@ def create_etit_kb(unit):
     kb = types.InlineKeyboardMarkup()
     kb.add(addkb(kb, 'Имя: '+unit['name'], 'change name '+str(unit['id'])))
     kb.add(addkb(kb, 'Класс: '+unit['class'], 'change class '+str(unit['id'])))
-    kb.add(addkb(kb, 'Раса: '+unit['race'], 'change race '+str(unit['id'])))
     kb.add(addkb(kb, 'Раса: '+unit['race'], 'change race '+str(unit['id'])))
     kb.add(addkb(kb, 'Хп: '+str(unit['hp']), 'change hp '+str(unit['id'])))
     kb.add(addkb(kb, 'Макс.хп: '+str(unit['maxhp']), 'change maxhp '+str(unit['id'])))
@@ -155,13 +222,10 @@ def randomname():
         return random.choice(names)
         
 def randomclass():
-        classes = ['bard', 'barbarian', 'fighter', 'wizard', 'druid', 'cleric', 'warlock', 'monk', 'paladin',
-                  'rogue', 'ranger', 'sorcerer']
         return random.choice(classes)
         
         
 def randomrace():
-        races = ['elf', 'human', 'tiefling', 'half-elf', 'halfling', 'half-orc', 'dwarf', 'gnome']
         return random.choice(races)
         
 
