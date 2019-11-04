@@ -22,7 +22,9 @@ if nowid.find_one({}) == None:
 
 base = {
     'units':{},
-    'alpha_access':False
+    'alpha_access':False,
+    'current_stat':None,
+    'current_unit':None
 }
 
 
@@ -69,6 +71,49 @@ def set_stats(m):
     bot.send_message(m.chat.id, 'Выберите юнита, которого хотите отредактировать.', reply_markup=kb)
         
 
+@bot.callback_query_handler(func=lambda call: True)
+def inline(call):
+    user = createuser(call)
+    if 'edit' in call.data:
+        unit = user['units'][int(call.data.split(' ')[1])]
+        if unit == None:
+            bot.answer_callback_query(call.id, 'Такого юнита не существует!', show_alert = True)
+            return
+        kb = create_edit_kb(unit)
+        bot.send_message(m.chat.id, 'Нажмите на характеристику для её изменения.', reply_markup=kb)
+    
+    
+def create_etit_kb(unit):
+    player = users.find_one({'id':unit['player']})
+    if player != None:
+        player = player['name']+' ('+str(player['id'])+')'
+    kb = types.InlineKeyboardMarkup()
+    kb.add(addkb(kb, 'Имя: '+unit['name'], 'change name '+str(unit['id'])))
+    kb.add(addkb(kb, 'Класс: '+unit['class'], 'change class '+str(unit['id'])))
+    kb.add(addkb(kb, 'Раса: '+unit['race'], 'change race '+str(unit['id'])))
+    kb.add(addkb(kb, 'Раса: '+unit['race'], 'change race '+str(unit['id'])))
+    kb.add(addkb(kb, 'Хп: '+str(unit['hp']), 'change hp '+str(unit['id'])))
+    kb.add(addkb(kb, 'Макс.хп: '+str(unit['maxhp']), 'change maxhp '+str(unit['id'])))
+    kb.add(addkb(kb, 'Сила: '+str(unit['strenght']), 'change strenght '+str(unit['id'])))
+    kb.add(addkb(kb, 'Ловкость: '+str(unit['dexterity']), 'change dexterity '+str(unit['id'])))
+    kb.add(addkb(kb, 'Телосложение: '+str(unit['constitution']), 'change constitution '+str(unit['id'])))
+    kb.add(addkb(kb, 'Интеллект: '+str(unit['intelligence']), 'change intelligence '+str(unit['id'])))
+    kb.add(addkb(kb, 'Мудрость: '+str(unit['wisdom']), 'change wisdom '+str(unit['id'])))
+    kb.add(addkb(kb, 'Харизма: '+str(unit['charisma']), 'change charisma '+str(unit['id'])))
+    kb.add(addkb(kb, 'Класс брони: '+str(unit['armor_class']), 'change armor_class '+str(unit['id'])))
+    kb.add(addkb(kb, 'Скорость (в футах): '+str(unit['speed']), 'change speed '+str(unit['id'])))
+    kb.add(addkb(kb, 'Инвентарь: '+str(len(unit['inventory']))+' предметов', 'change inventory '+str(unit['id'])))
+    kb.add(addkb(kb, 'Заклинания: '+str(len(unit['spells']))+' спеллов', 'change spells '+str(unit['id'])))
+    kb.add(addkb(kb, 'Управляющий юнитом: '+str(player)), 'change player '+str(unit['id'])))
+    kb.add(addkb(kb, 'Фото', 'change photo '+str(unit['id'])))
+    return kb
+           
+    
+    
+    
+        
+def addkb(kb, text, calldata):
+        return types.InlineKeyboardButton(text=text, callback_data = calldata)
         
 def createunit(user):
     maxx=20
@@ -102,6 +147,23 @@ def createunit(user):
         
   
 
+def randomname():
+        names = ['Лурин Нвуд', 'Лонг Лао', 'Корза Ксогоголь', 'Алстон Опплбай', 'Холг', 'Лаэл Бит', 'Иглай Тай', 
+                'Унео Ано', 'Джор Нарарис', 'Кара Чернин', 'Хама Ана', 'Мейлиль Думеин', 'Шаумар Илтазяра', 'Ромеро Писакар',
+                'Шандри Грэйкасл', 'Зэй Тилататна', 'Силусс Ори', 'Чиаркот Литоари', 'Дикай Талаф', 'Чка Хладоклят', 
+                'Вренн']
+        return random.choice(names)
+        
+def randomclass():
+        classes = ['bard', 'barbarian', 'fighter', 'wizard', 'druid', 'cleric', 'warlock', 'monk', 'paladin',
+                  'rogue', 'ranger', 'sorcerer']
+        return random.choice(classes)
+        
+        
+def randomrace():
+        races = ['elf', 'human', 'tiefling', 'half-elf', 'halfling', 'half-orc', 'dwarf', 'gnome']
+        return random.choice(races)
+        
 
 def randomid():
     id = nowid.find_one({})['id']
