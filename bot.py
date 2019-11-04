@@ -17,6 +17,12 @@ client=MongoClient(os.environ['database'])
 db=client.dnd
 users=db.users
 nowid = db.nowid
+spells = db.spells
+spells.insert_one({})
+if 'barbarian' not in spells.find_one({}):
+    spells.update_one({},{'$set':{'barbarian':{}, 'bard':{}, 'fighter':{}, 'wizard':{}, 'druid':{}, 
+                                 'cleric':{}, 'warlock':{}, 'monk':{}, 'paladin':{}, 'rogue':{}, 'ranger':{},
+                                 'sorcerer':{}}})
 if nowid.find_one({}) == None:
     nowid.insert_one({'id':1})
 
@@ -24,7 +30,8 @@ base = {
     'units':{},
     'alpha_access':False,
     'current_stat':None,
-    'current_unit':None
+    'current_unit':None,
+    'spells':{}
 }
 
 classes = ['bard', 'barbarian', 'fighter', 'wizard', 'druid', 'cleric', 'warlock', 'monk', 'paladin',
@@ -34,6 +41,34 @@ classes = ['bard', 'barbarian', 'fighter', 'wizard', 'druid', 'cleric', 'warlock
 races = ['elf', 'human', 'tiefling', 'half-elf', 'halfling', 'half-orc', 'dwarf', 'gnome']
 
 
+# rangee: [дальность_применения, тип_цели]
+# duration: 0, если мгновенное
+# damage: [3, 6] = 3d6
+
+class Spell(lvl = 0, casttime = 1, rangee = {'distance':30, 'target_type': 'target'}, duration = 1, 
+           savethrow = 'dexterity', damage = [3, 6], heal = [0, 0], actions = ['damage']):
+    def __init__(self):
+        self.lvl = lvl
+        self.casttime = casttime   # действия
+        self.range = rangee        # футы
+        self.duration = duration   # минуты
+        self.savethrow = savethrow
+        self.damage = damage
+        self.heal = heal
+        self.actions = actions
+
+
+@bot.message_handler(commands=['addspell'])
+def addspell(m):
+    user = createuser(m)
+    if not user['alpha_access']:
+        bot.send_message(m.chat.id, 'У вас нет альфа-доступа! Пишите @Loshadkin.')
+        return
+    spell = createspell()
+    users.update_one({'id':user['id']},{'$set':{'spells.'+str(spell['id']):spell}})
+    bot.send_message(m.chat.id, 'Вы успешно создали заклинание! Теперь настройте его (/set_spell).')
+    
+        
 @bot.message_handler(commands=['create_unit'])
 def createunit(m):
     user = createuser(m)
@@ -75,6 +110,37 @@ def set_stats(m):
             nextt = True
         i+=1
     bot.send_message(m.chat.id, 'Выберите юнита, которого хотите отредактировать.', reply_markup=kb)
+    
+    
+@bot.message_handler(commands=['set_spell'])
+def set_stats(m):
+    if m.chat.id != m.from_user.id:
+        bot.send_message(m.chat.id, 'Можно использовать только в личке!')
+        return
+    user = createuser(m)
+    if not user['alpha_access']:
+        bot.send_message(m.chat.id, 'У вас нет альфа-доступа! Пишите @Loshadkin.')
+        return
+    kbs = []
+    kb = types.InlineKeyboardMarkup()
+    for ids in user['spells']:
+        spell = user['spells'][ids]
+        kbs.append(types.InlineKeyboardButton(text = spell['name'], callback_data = str(spell['id'])+' spell_manage'))
+    i = 0
+    nextt = False
+    toadd=[]
+    while i < len(kbs):
+        if nextt == True:
+            kb.add(*toadd)
+            toadd = []
+            toadd.append(kbs[i])
+            nextt = False
+        else:
+            toadd.append(kbs[i])
+        if i%2 == 1:
+            nextt = True
+        i+=1
+    bot.send_message(m.chat.id, 'Выберите спелл, который хотите отредактировать.', reply_markup=kb)
         
 
 @bot.message_handler()
@@ -135,14 +201,14 @@ def msgs(m):
 def inline(call):
     user = createuser(call)
     if 'edit' in call.data:
-        unit = user['units'][int(call.data.split(' ')[1])]
+        unit = user['units'][int(call.data.split(' ')[0])]
         if unit == None:
             bot.answer_callback_query(call.id, 'Такого юнита не существует!', show_alert = True)
             return
         kb = create_edit_kb(unit)
         bot.send_message(m.chat.id, 'Нажмите на характеристику для её изменения.', reply_markup=kb)
         
-    elif 'change' in call.data:
+    elif 'change' in call.data and 'spell' not in call.data:
         blist = ['inventory', 'spells', 'player', 'photo']
         numbervalues = ['hp', 'maxhp', 'strenght', 'dexterity', 'constitution', 'intelligence', 
                        'wisdom', 'charisma', 'armor_class', 'speed', 'name']
@@ -180,8 +246,32 @@ def inline(call):
             elif what == 'spells':
                 pass
             ################################################
+    elif 'spell_manage' in call.data:
+        spell = user['spells'][int(call.data.split(' ')[0])]
+        if spell == None:
+            bot.answer_callback_query(call.id, 'Такого спелла не существует!', show_alert = True)
+            return
+        kb = create_spell_kb(spell)
+        bot.send_message(m.chat.id, 'Нажмите на характеристику для её изменения.', reply_markup=kb)
+        
+        
                 
                 
+    
+def create_spell_kb(spell):
+    kb = types.InlineKeyboardMarkup()
+    kb.add(addkb(kb, 'Название: '+spell['name'], 'spell_change name '+str(spell['id'])))
+    kb.add(addkb(kb, 'Классы: '+str(spell['classes']), 'spell_change classes '+str(spell['id'])))
+    kb.add(addkb(kb, 'Описание: '+str(spell['description']), 'spell_change description '+str(spell['id'])))
+    kb.add(addkb(kb, 'Уровень: '+str(spell['lvl']), 'spell_change lvl '+str(spell['id'])))
+    kb.add(addkb(kb, 'Время каста: '+str(spell['casttime'])+' действий', 'spell_change casttime '+str(spell['id'])))
+    kb.add(addkb(kb, 'Дальность применения: '+str(len(spell['range']))+' параметров', 'spell_change range '+str(spell['id'])))
+    kb.add(addkb(kb, 'Длительность: '+str(spell['duration']), 'spell_change range '+str(spell['id'])))
+    kb.add(addkb(kb, 'Спасбросок: '+str(spell['savethrow']), 'spell_change savethrow '+str(spell['id'])))
+    kb.add(addkb(kb, 'Урон: '+str(spell['damage'][0])+'d'+str(spell['damage'][1]), 'spell_change damage '+str(spell['id'])))
+    kb.add(addkb(kb, 'Лечение: '+str(spell['heal'][0])+'d'+str(spell['heal'][1]), 'spell_change heal '+str(spell['id'])))
+    kb.add(addkb(kb, 'Эффекты спелла: '+str(len(spell['actions'])+' эффектов', 'spell_change actions '+str(spell['id'])))
+    return kb
     
     
 def create_etit_kb(unit):
@@ -209,6 +299,23 @@ def create_etit_kb(unit):
     return kb
            
     
+    
+def createspell():
+    id=randomid()
+    return {
+        'id':id,
+        'name':str(id),
+        'classes':['sorcerer', 'wizard'],
+        'description':'Описание спелла',
+        'lvl':0,
+        'casttime':1,
+        'range':{'distance':30, 'target_type': 'target'},
+        'duration':1,
+        'savethrow':'dexterity',
+        'damage':[3, 6],
+        'heal':[0, 0],
+        'actions':['damage']
+    }
     
     
         
