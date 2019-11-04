@@ -81,32 +81,52 @@ def set_stats(m):
 def msgs(m):
     user = createuser(m)
     if user['current_stat'] != None and user['current_unit'] != None and m.from_user.id == m.chat.id:
+        unit = user['units'][user['current_unit']]
         numbervalues = ['hp', 'maxhp', 'strenght', 'dexterity', 'constitution', 'intelligence', 
                        'wisdom', 'charisma', 'armor_class', 'speed']
-        text = False
-        if user['current_stat'] in numbervalues:
-            test = True
-        val = m.text
-        if test:
-            try:
-                val = int(m.text)
-            except:
-                bot.send_message(m.chat.id, 'Нужно значение типа int!')
-                return
-        test2 = False    
-        if user['current_stat'] == 'race':
-            d = races.copy()
-            test2 = True
-        if user['current_stat'] == 'class':
-            d = classes.copy()
-            test2 = True
-        if test2:
-            if m.text.lower() not in d:
-                bot.send_message(m.chat.id, 'Такого значения нет в списке существующих!')
-                return
-        users.update_one({'id':user['id']},{'$set':{'units.'+str(user['current_unit'])+'.'+user['current_stat']:val}})
-        bot.send_message(m.chat.id, 'Успешно изменена характеристика "'+user['current_stat']+'" на "'+val+'"!')
-        
+        blist = ['inventory', 'spells', 'player', 'photo']
+        if user['current_stat'] not in blist:
+            text = False
+            if user['current_stat'] in numbervalues:
+                test = True
+            val = m.text
+            if test:
+                try:
+                    val = int(m.text)
+                except:
+                    bot.send_message(m.chat.id, 'Нужно значение типа int!')
+                    return
+            test2 = False    
+            if user['current_stat'] == 'race':
+                d = races.copy()
+                test2 = True
+            if user['current_stat'] == 'class':
+                d = classes.copy()
+                test2 = True
+            if test2:
+                if m.text.lower() not in d:
+                    bot.send_message(m.chat.id, 'Такого значения нет в списке существующих!')
+                    return
+            users.update_one({'id':user['id']},{'$set':{'units.'+str(user['current_unit'])+'.'+user['current_stat']:val}})
+            bot.send_message(m.chat.id, unit['name']+': успешно изменена характеристика "'+user['current_stat']+'" на "'+val+'"!')
+            
+        else:
+            if user['current_stat'] == 'inventory':
+                inv = []
+                t = m.text.split(', ')
+                for ids in t:
+                    inv.append(ids)
+                tt = ''
+                for ids in inv:
+                    tt +=ids+', '
+                tt = tt[:len(tt)-2]
+                users.update_one({'id':user['id']},{'$set':{'units.'+str(user['current_unit'])+'.'+user['current_stat']: inv}})
+                bot.send_message(m.chat.id, unit['name']+': инвентарь юнита успешно изменён на '+tt+'!')
+                
+            elif user['current_stat'] == '':
+                pass
+            ##########################################################
+           
             
         
         
@@ -131,8 +151,8 @@ def inline(call):
         if unit == None:
             bot.answer_callback_query(call.id, 'Такого юнита не существует!', show_alert = True)
             return
+        users.update_one({'id':user['id']},{'$set':{'current_unit':unit['id'], 'current_stat':what}})
         if what not in blist:
-            users.update_one({'id':user['id']},{'$set':{'current_unit':unit['id'], 'current_stat':what}})
             if what in numbervalues:
                 bot.send_message(m.chat.id, 'Теперь пришлите мне новое значение характеристики "'+what+'".')
             else:
@@ -148,6 +168,19 @@ def inline(call):
                         alls += '`'+ids+'` '
                 bot.send_message(m.chat.id, 'Теперь пришлите мне новое значение характеристики "'+what+'".\n'+
                                  'Существующие '+r+': '+alls, parse_mode = 'markdown')
+        else:
+            if what == 'inventory':
+                inv = '`'
+                for ids in unit['inventory']:
+                    inv += ids+', '
+                inv = inv[:len(inv)-2]
+                inv += '`'
+                bot.send_message(m.chat.id, 'Теперь пришлите мне новый инвентарь, перечисляя предметы через запятую. Текущий '+
+                                 'инвентарь: '+inv, parse_mode='markdown')
+            elif what == 'spells':
+                pass
+            ################################################
+                
                 
     
     
@@ -206,7 +239,7 @@ def createunit(user):
         'death_saves(success)':0,
         'death_saves(fail)':0,
         'spells':{},
-        'inventory':{},
+        'inventory':[],
         'current_weapon':None,
         'owner':user['id'],
         'player':None
