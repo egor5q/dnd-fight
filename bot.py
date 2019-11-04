@@ -32,9 +32,41 @@ def createunit(m):
     if not user['alpha_access']:
         bot.send_message(m.chat.id, 'У вас нет альфа-доступа! Пишите @Loshadkin.')
         return
-    createunit(user)
+    unit = createunit(user)
+    users.update_one({'id':user['id']},{'$set':{'units.'+str(unit['id']):unit}})
     bot.send_message(m.chat.id, 'Вы успешно создали юнита! Теперь настройте его (/set_stats).')
         
+      
+    
+@bot.message_handler(commands=['set_stats'])
+def set_stats(m):
+    if m.chat.id != m.from_user.id:
+        bot.send_message(m.chat.id, 'Можно использовать только в личке!')
+        return
+    user = createuser(m)
+    if not user['alpha_access']:
+        bot.send_message(m.chat.id, 'У вас нет альфа-доступа! Пишите @Loshadkin.')
+        return
+    kbs = []
+    kb = types.InlineKeyboardMarkup()
+    for ids in user['units']:
+        unit = user['units'][ids]
+        kbs.append(types.InlineKeyboardButton(text = unit['name'], callback_data = str(unit['id'])+' edit'))
+    i = 0
+    nextt = False
+    toadd=[]
+    while i < len(kbs):
+        if nextt == True:
+            kb.add(*toadd)
+            toadd = []
+            toadd.append(kbs[i])
+            nextt = False
+        else:
+            toadd.append(kbs[i])
+        if i%2 == 1:
+            nextt = True
+        i+=1
+    bot.send_message(m.chat.id, 'Выберите юнита, которого хотите отредактировать.', reply_markup=kb)
         
 
         
