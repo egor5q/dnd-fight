@@ -143,6 +143,18 @@ def set_stats(m):
     bot.send_message(m.chat.id, 'Выберите спелл, который хотите отредактировать.', reply_markup=kb)
         
 
+@bot.message_handler(content_types = ['photo'])
+def msgsp(m):
+    user = createuser(m)
+    if user['current_stat'] != None and user['current_unit'] != None and m.from_user.id == m.chat.id:
+        unit = user['units'][user['current_unit']]
+        if user['current_stat'] == 'photo':
+            users.update_one({'id':user['id']},{'$set':{'units.'+str(user['current_unit'])+'.'+user['current_stat']:m.photo[0].file_id}})
+            users.update_one({'id':user['id']},{'$set':{'current_stat':None, 'current_unit':None}})
+            bot.send_message(m.chat.id, 'Новое фото установлено!')
+            
+            
+        
 @bot.message_handler()
 def msgs(m):
     user = createuser(m)
@@ -162,18 +174,8 @@ def msgs(m):
                 except:
                     bot.send_message(m.chat.id, 'Нужно значение типа int!')
                     return
-            test2 = False    
-            if user['current_stat'] == 'race':
-                d = races.copy()
-                test2 = True
-            if user['current_stat'] == 'class':
-                d = classes.copy()
-                test2 = True
-            if test2:
-                if m.text.lower() not in d:
-                    bot.send_message(m.chat.id, 'Такого значения нет в списке существующих!')
-                    return
             users.update_one({'id':user['id']},{'$set':{'units.'+str(user['current_unit'])+'.'+user['current_stat']:val}})
+            users.update_one({'id':user['id']},{'$set':{'current_stat':None, 'current_unit':None}})
             bot.send_message(m.chat.id, unit['name']+': успешно изменена характеристика "'+user['current_stat']+'" на "'+val+'"!')
             
         else:
@@ -187,10 +189,11 @@ def msgs(m):
                     tt +=ids+', '
                 tt = tt[:len(tt)-2]
                 users.update_one({'id':user['id']},{'$set':{'units.'+str(user['current_unit'])+'.'+user['current_stat']: inv}})
+                users.update_one({'id':user['id']},{'$set':{'current_stat':None, 'current_unit':None}})
                 bot.send_message(m.chat.id, unit['name']+': инвентарь юнита успешно изменён на '+tt+'!')
                 
-            elif user['current_stat'] == '':
-                pass
+                
+                
             ##########################################################
            
             
@@ -243,8 +246,11 @@ def inline(call):
                 inv += '`'
                 bot.send_message(m.chat.id, 'Теперь пришлите мне новый инвентарь, перечисляя предметы через запятую. Текущий '+
                                  'инвентарь: '+inv, parse_mode='markdown')
-            elif what == 'spells':
-                pass
+            elif what == 'photo':
+                if unit['photo'] != None:
+                    bot.send_photo(m.chat.id, unit['photo'], caption = 'Текущая фотография юнита. Для изменения отправьте новое фото.')
+                else:
+                    bot.send_message(m.chat.id, 'Фотография отсутствует. Для изменения отправьте новое фото.')
             ################################################
     elif 'spell_manage' in call.data:
         spell = user['spells'][int(call.data.split(' ')[0])]
@@ -294,7 +300,6 @@ def create_etit_kb(unit):
     kb.add(addkb(kb, 'Скорость (в футах): '+str(unit['speed']), 'change speed '+str(unit['id'])))
     kb.add(addkb(kb, 'Инвентарь: '+str(len(unit['inventory']))+' предметов', 'change inventory '+str(unit['id'])))
     kb.add(addkb(kb, 'Заклинания: '+str(len(unit['spells']))+' спеллов', 'change spells '+str(unit['id'])))
-    kb.add(addkb(kb, 'Управляющий юнитом: '+str(player)), 'change player '+str(unit['id'])))
     kb.add(addkb(kb, 'Фото', 'change photo '+str(unit['id'])))
     return kb
            
